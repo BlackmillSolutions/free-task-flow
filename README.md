@@ -1,6 +1,6 @@
-# monday-clone
+# free-task-flow
 
-A clone of the popular project management tool, Monday.com. This project aims to replicate the core features and functionality of Monday.com, providing users with a visual and intuitive way to manage their tasks and projects.
+A project management tool designed to provide users with a visual and intuitive way to manage their tasks and projects.
 
 ## Features
 
