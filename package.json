@@ -10,13 +10,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-table": "^8.20.6",
+    "@types/react-router-dom": "^5.3.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.4.3",
+    "react-select": "^5.10.0",
+    "react-table": "^7.8.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^18.2.17",
+    "@types/react-table": "^7.7.20",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
