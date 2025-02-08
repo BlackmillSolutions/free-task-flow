@@ -3,7 +3,7 @@ export interface Task {
   title: string;
   description: string;
   status: 'Open' | 'In Progress' | 'Done';
-  dueDate: string;
+  dueDate: string | null;
   groupId: string;
   priority: 'high' | 'medium' | 'low';
   assignee: string;

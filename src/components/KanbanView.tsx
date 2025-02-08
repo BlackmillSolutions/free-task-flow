@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { format, parseISO } from "date-fns";
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import TaskCard from './TaskCard';
-import { FaPlus, FaEllipsisH, FaTimes } from 'react-icons/fa';
+import { FaPlus, FaEllipsisH } from 'react-icons/fa';
 import { Task } from '../utils/database';
 import { useTaskStore } from '../store/taskStore';
 import NewTaskModal from './NewTaskModal';
 import { useProjectSelection } from '../hooks/useProjectSelection';
+import TaskDetailModal from './TaskDetailModal';
 
 interface KanbanColumn {
   id: string;
@@ -29,50 +29,13 @@ const getColumnColor = (status: Task['status']): string => {
   }
 };
 
-type TaskWithMetadata = Task & {
-  attachments?: number;
-  comments?: number;
-};
-
-interface CardPreviewProps {
-  task: TaskWithMetadata;
-  onClose: () => void;
-}
-
-const CardPreview: React.FC<CardPreviewProps> = ({ task, onClose }) => {
-  const statusColor = getColumnColor(task.status);
-  
-  return (
-    <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{task.title}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <FaTimes />
-          </button>
-        </div>
-        <div className="text-sm text-gray-600">
-          <p>Status: <span className="font-medium" style={{color: statusColor}}>{task.status}</span></p>
-          <p>Priority: {task.priority}</p>
-          <p>Due Date: {task.dueDate ? format(parseISO(task.dueDate), 'MMM d, yyyy') : '-'}</p>
-          <p>Assignee: {task.assignee}</p>
-          <p>Description: {task.description}</p>
-          <p>Progress: {task.progress}%</p>
-          <p>Attachments: {task.attachments || 0}</p>
-          <p>Comments: {task.comments || 0}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const KanbanView: React.FC = () => {
-  const { tasks, selectedProjects, isLoading, fetchData, updateTask, addTask } = useTaskStore();
+  const { tasks, projects, selectedProjects, isLoading, fetchData, updateTask, addTask } = useTaskStore();
   const { defaultProject } = useProjectSelection();
   
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [isWipLimitExceeded, setIsWipLimitExceeded] = useState(false);
-  const [previewTask, setPreviewTask] = useState<TaskWithMetadata | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -238,7 +201,7 @@ const KanbanView: React.FC = () => {
                                   className={`transition-transform duration-200 ${
                                     snapshot.isDragging ? 'scale-105 shadow-lg' : ''
                                   }`}
-                                  onClick={() => setPreviewTask(task)}
+                                  onClick={() => setSelectedTask(task)}
                                 >
                                   <TaskCard
                                     {...task} 
@@ -284,8 +247,16 @@ const KanbanView: React.FC = () => {
           </div>
         </DragDropContext>
       </div>
-      {previewTask && (
-        <CardPreview task={previewTask} onClose={() => setPreviewTask(null)} />
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          projects={projects}
+          isOpen={true}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={(taskId, updates) => {
+            updateTask(taskId, updates);
+          }}
+        />
       )}
     </div>
   );

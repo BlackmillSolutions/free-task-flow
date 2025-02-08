@@ -5,6 +5,7 @@ import PrioritySelect from '../PrioritySelect';
 import ProgressBar from '../ProgressBar';
 import ProjectSelect from '../ProjectSelect';
 import { Project } from '../../utils/database';
+import { DueDateCell } from './DueDateCell';
 
 const columnHelper = createColumnHelper<Task>();
 
@@ -62,11 +63,14 @@ export const createTableColumns = (
     id: 'dueDate',
     header: 'Due Date',
     cell: info => (
-      <div className="text-[#676879]">
-        {info.getValue() ? new Date(info.getValue()).toLocaleDateString() : '-'}
+      <div className="w-[140px]">
+        <DueDateCell
+          value={info.getValue()}
+          onChange={(value) => handleSaveEdit(info.row.original.id, 'dueDate', value)}
+        />
       </div>
     ),
-    size: 120,
+    size: 140,
   }),
   columnHelper.accessor((row) => row.assignee, {
     id: 'assignee',

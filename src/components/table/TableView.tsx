@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import TaskDetailModal from '../TaskDetailModal';
 import {
   useReactTable,
   getCoreRowModel,
@@ -42,6 +43,7 @@ const TableView: React.FC = () => {
   const [editingCell, setEditingCell] = useState<{ taskId: string; columnId: keyof Task } | null>(null);
   const [editedValue, setEditedValue] = useState('');
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
@@ -82,8 +84,24 @@ const TableView: React.FC = () => {
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (editingCell && tableRef.current && !tableRef.current.contains(event.target as Node)) {
+      handleSaveEdit(editingCell.taskId, editingCell.columnId, editedValue as Task[keyof Task]);
+    }
+  }, [editingCell, editedValue]);
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [handleClickOutside]);
+
   const handleEditCell = (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => {
-    if (columnId === 'status' || columnId === 'priority' || columnId === 'progress') {
+    const autoSaveColumns = ['status', 'priority', 'progress', 'dueDate'];
+    if (autoSaveColumns.includes(columnId)) {
       handleSaveEdit(taskId, columnId, value);
     } else {
       setEditingCell({ taskId, columnId });
@@ -122,7 +140,7 @@ const TableView: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div ref={tableRef} className="flex flex-col h-full bg-white relative">
       <TableHeader
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
@@ -148,17 +166,19 @@ const TableView: React.FC = () => {
         {/* Table Body */}
         <div className="flex-1">
           {table.getRowModel().rows.map(row => (
-            <TableRow
-              key={row.id}
-              row={row}
-              editingCell={editingCell}
-              editedValue={editedValue}
-              onEditCell={handleEditCell}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
-              onDeleteTask={handleDeleteTask}
-              setEditedValue={setEditedValue}
-            />
+                  <div onClick={() => !editingCell && setSelectedTask(row.original)}>
+                    <TableRow
+                      key={row.id}
+                      row={row}
+                      editingCell={editingCell}
+                      editedValue={editedValue}
+                      onEditCell={handleEditCell}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onDeleteTask={handleDeleteTask}
+                      setEditedValue={setEditedValue}
+                    />
+                  </div>
           ))}
         </div>
       </div>
@@ -170,6 +190,17 @@ const TableView: React.FC = () => {
           onClose={() => setIsNewTaskModalOpen(false)}
           onSubmit={addTask}
           groupId={defaultProject}
+        />
+      )}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          projects={projects}
+          isOpen={true}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={(taskId, updates) => {
+            updateTask(taskId, updates);
+          }}
         />
       )}
       {isNewProjectModalOpen && (

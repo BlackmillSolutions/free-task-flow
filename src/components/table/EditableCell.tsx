@@ -1,5 +1,4 @@
-import React from 'react';
-import { FaCheck, FaTimes } from 'react-icons/fa';
+import React, { useEffect, useRef } from 'react';
 import { Task } from '../../utils/database';
 
 interface EditableCellProps {
@@ -17,40 +16,37 @@ export const EditableCell: React.FC<EditableCellProps> = ({
   onCancel,
   columnId,
 }) => {
-  // These columns are handled by their own components
-  const nonEditableColumns: (keyof Task)[] = ['status', 'priority', 'progress', 'groupId'];
+  const inputRef = useRef<HTMLInputElement>(null);
+  const nonEditableColumns: (keyof Task)[] = ['status', 'priority', 'progress', 'groupId', 'dueDate'];
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        onSave();
+      } else if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    inputRef.current?.addEventListener('keydown', handleKeyDown);
+    return () => {
+      inputRef.current?.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onSave, onCancel]);
 
   if (nonEditableColumns.includes(columnId)) {
     return null;
   }
 
   return (
-    <div className="flex items-center flex-1">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:border-[#0073ea]"
-        autoFocus
-      />
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onSave();
-        }}
-        className="ml-2 p-1 text-[#0073ea] hover:text-[#0060c2]"
-      >
-        <FaCheck />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onCancel();
-        }}
-        className="ml-1 p-1 text-[#676879] hover:text-[#323338]"
-      >
-        <FaTimes />
-      </button>
-    </div>
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onSave}
+      className="w-full px-2 py-1 text-sm bg-white border rounded focus:outline-none focus:border-[#0073ea] focus:ring-1 focus:ring-[#0073ea]"
+      autoFocus
+    />
   );
 };
