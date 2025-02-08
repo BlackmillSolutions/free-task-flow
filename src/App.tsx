@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Route, Routes, NavLink, useLocation } from 're
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import BoardView from './components/BoardView';
-import TableView from './components/TableView';
+import TableView from './components/table/TableView';
 import CalendarView from './components/CalendarView';
 import TimelineView from './components/TimelineView';
 import DashboardView from './components/DashboardView';
