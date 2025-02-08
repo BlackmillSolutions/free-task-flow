@@ -1,24 +1,19 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import {
-  readDatabase,
-  addItem,
-  updateItem,
-  deleteItem,
-  Task,
-} from '../utils/database';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
   ColumnDef,
   createColumnHelper,
   flexRender,
   VisibilityState,
   SortingState,
+  Row as TableRow,
 } from '@tanstack/react-table';
+import { rankItem } from '@tanstack/match-sorter-utils';
 import {
   FaSort,
-  FaFilter,
   FaPlus,
   FaEllipsisH,
   FaCheck,
@@ -26,102 +21,83 @@ import {
   FaEye,
   FaEyeSlash,
   FaTrashAlt,
-  FaLayerGroup
+  FaSearch,
 } from 'react-icons/fa';
-import Select from 'react-select';
+import { Task } from '../utils/database';
+import { useTaskStore } from '../store/taskStore';
 import NewTaskModal from './NewTaskModal';
 import StatusSelect from './StatusSelect';
 import PrioritySelect from './PrioritySelect';
 import ProgressBar from './ProgressBar';
+import ProjectFilter from './ProjectFilter';
+import ProjectModal from './ProjectModal';
+import ProjectSelect from './ProjectSelect';
+import { Menu } from '@headlessui/react';
+import { useProjectSelection } from '../hooks/useProjectSelection';
 
 const columnHelper = createColumnHelper<Task>();
 
-interface Project {
-  id: string;
-  name: string;
-  color: string;
-}
-
-interface ProjectOption {
-  value: string;
-  label: string;
-  color: string;
-}
+const fuzzyFilter = (row: TableRow<Task>, columnId: string, value: string, addMeta: any) => {
+  const itemRank = rankItem(row.getValue(columnId), value);
+  addMeta({ itemRank });
+  return itemRank.passed;
+};
 
 const TableView: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects] = useState<Project[]>([
-    { id: 'group1', name: 'Project A', color: '#0073ea' },
-    { id: 'group2', name: 'Project B', color: '#00c875' },
-    { id: 'group3', name: 'Project C', color: '#fb275d' },
-    { id: 'group4', name: 'Project D', color: '#784bd1' },
-  ]);
-  const [selectedProjects, setSelectedProjects] = useState<ProjectOption[]>(
-    projects.map(project => ({
-      value: project.id,
-      label: project.name,
-      color: project.color
-    }))
-  );
-  const [editingCell, setEditingCell] = useState<{ taskId: string; columnId: string } | null>(null);
-  const [editedValue, setEditedValue] = useState('');
-  const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
-  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-  const columnMenuRef = useRef<HTMLDivElement>(null);
+  const {
+    tasks,
+    projects,
+    selectedProjects,
+    isLoading,
+    fetchData,
+    addTask,
+    updateTask,
+    deleteTask,
+    addProject,
+  } = useTaskStore();
 
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [editingCell, setEditingCell] = useState<{ taskId: string; columnId: keyof Task } | null>(null);
+  const [editedValue, setEditedValue] = useState('');
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
-  const projectOptions = useMemo(() => 
-    projects.map(project => ({
-      value: project.id,
-      label: project.name,
-      color: project.color
-    }))
-  , [projects]);
-
-  const loadTasks = useCallback(async () => {
-    const db = await readDatabase();
-    setTasks(db.tasks);
-  }, []);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const { defaultProject } = useProjectSelection();
 
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    fetchData();
+  }, [fetchData]);
 
   const filteredTasks = useMemo(() => {
-    if (selectedProjects.length === 0) return tasks;
-    return tasks.filter(task => 
-      selectedProjects.some(project => project.value === task.groupId)
-    );
+    if (selectedProjects.size === 0) return tasks;
+    return tasks.filter(task => selectedProjects.has(task.groupId));
   }, [tasks, selectedProjects]);
 
   const columns = useMemo(() => [
-    columnHelper.accessor('title', {
+    columnHelper.accessor((row) => row.title, {
+      id: 'title',
       header: 'Title',
-      cell: info => (
-        <div className="font-medium text-[#323338]">{info.getValue()}</div>
-      ),
+      cell: info => <div className="font-medium text-[#323338]">{info.getValue()}</div>,
       size: 200,
     }),
-    columnHelper.accessor('groupId', {
+    columnHelper.accessor((row) => row.groupId, {
+      id: 'groupId',
       header: 'Project',
-      cell: info => {
-        const project = projects.find(p => p.id === info.getValue());
-        return project ? (
-          <div 
-            className="px-2 py-1 rounded text-white inline-block"
-            style={{ backgroundColor: project.color }}
-          >
-            {project.name}
-          </div>
-        ) : null;
-      },
+      cell: info => (
+        <div className="w-[140px]">
+          <ProjectSelect
+            value={info.getValue()}
+            projects={projects}
+            onChange={(value) => handleSaveEdit(info.row.original.id, 'groupId', value)}
+          />
+        </div>
+      ),
       size: 140,
     }),
-    columnHelper.accessor('status', {
+    columnHelper.accessor((row) => row.status, {
+      id: 'status',
       header: 'Status',
       cell: info => (
         <div className="w-[140px]">
@@ -133,7 +109,8 @@ const TableView: React.FC = () => {
       ),
       size: 160,
     }),
-    columnHelper.accessor('priority', {
+    columnHelper.accessor((row) => row.priority, {
+      id: 'priority',
       header: 'Priority',
       cell: info => (
         <div className="w-[140px]">
@@ -145,7 +122,8 @@ const TableView: React.FC = () => {
       ),
       size: 160,
     }),
-    columnHelper.accessor('dueDate', {
+    columnHelper.accessor((row) => row.dueDate, {
+      id: 'dueDate',
       header: 'Due Date',
       cell: info => (
         <div className="text-[#676879]">
@@ -154,7 +132,8 @@ const TableView: React.FC = () => {
       ),
       size: 120,
     }),
-    columnHelper.accessor('assignee', {
+    columnHelper.accessor((row) => row.assignee, {
+      id: 'assignee',
       header: 'Assignee',
       cell: info => (
         <div className="text-[#676879]">
@@ -163,7 +142,8 @@ const TableView: React.FC = () => {
       ),
       size: 120,
     }),
-    columnHelper.accessor('description', {
+    columnHelper.accessor((row) => row.description, {
+      id: 'description',
       header: 'Description',
       cell: info => (
         <div className="text-[#676879] line-clamp-2">
@@ -172,19 +152,20 @@ const TableView: React.FC = () => {
       ),
       size: 200,
     }),
-    columnHelper.accessor('progress', {
+    columnHelper.accessor((row) => row.progress, {
+      id: 'progress',
       header: 'Progress',
       cell: info => (
         <div className="w-[140px]">
           <ProgressBar
-            value={info.getValue() as number}
+            value={info.getValue()}
             onChange={(value) => handleSaveEdit(info.row.original.id, 'progress', value)}
           />
         </div>
       ),
       size: 100,
     }),
-  ], [projects]);
+  ] as ColumnDef<Task>[], [projects]);
 
   const table = useReactTable({
     data: filteredTasks,
@@ -192,28 +173,18 @@ const TableView: React.FC = () => {
     state: {
       sorting,
       columnVisibility,
+      globalFilter,
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const handleAddTask = async (taskData: Omit<Task, 'id'>) => {
-    const newTask: Task = {
-      ...taskData,
-      id: String(Date.now()),
-    };
-    await addItem('tasks', newTask);
-    await loadTasks();
-  };
-
-  const openNewTaskModal = (projectId: string) => {
-    setSelectedProjectId(projectId);
-    setIsNewTaskModalOpen(true);
-  };
-
-  const handleEditCell = (taskId: string, columnId: string, value: string | number) => {
+  const handleEditCell = (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => {
     if (columnId === 'status' || columnId === 'priority' || columnId === 'progress') {
       handleSaveEdit(taskId, columnId, value);
     } else {
@@ -222,14 +193,8 @@ const TableView: React.FC = () => {
     }
   };
 
-  const handleSaveEdit = async (taskId: string, columnId: string, value: string | number) => {
-    const updatedTask = tasks.find(task => task.id === taskId);
-    if (!updatedTask) return;
-
-    const updatedTaskWithChanges = { ...updatedTask, [columnId]: value };
-    await updateItem('tasks', taskId, updatedTaskWithChanges);
-    await loadTasks();
-
+  const handleSaveEdit = async (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => {
+    await updateTask(taskId, { [columnId]: value });
     setEditingCell(null);
     setEditedValue('');
   };
@@ -240,115 +205,49 @@ const TableView: React.FC = () => {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    await deleteItem('tasks', taskId);
-    await loadTasks();
+    await deleteTask(taskId);
   };
 
-  const toggleColumnVisibility = (columnId: string) => {
-    table.getColumn(columnId)?.toggleVisibility();
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (columnMenuRef.current && !columnMenuRef.current.contains(event.target as Node)) {
-        setIsColumnMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0073ea]"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white relative">
       {/* Table Controls */}
       <div className="flex items-center justify-between p-4 border-b border-[#e6e9ef] bg-white">
         <div className="flex items-center space-x-4">
-          {/* Project Select */}
-          <div className="flex items-center min-w-[300px] bg-[#f5f6f8] rounded-lg px-3 py-1">
-            <FaLayerGroup className="text-[#676879] mr-2" />
-            <Select
-              isMulti
-              value={selectedProjects}
-              onChange={(selected) => setSelectedProjects(selected as ProjectOption[])}
-              options={projectOptions}
-              placeholder="Filter by project..."
-              className="react-select-container w-full"
-              classNamePrefix="react-select"
-              isClearable={false}
-              isSearchable={true}
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  border: 'none',
-                  boxShadow: 'none',
-                  backgroundColor: 'transparent',
-                  minHeight: '34px',
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  backgroundColor: state.isSelected ? '#dcdfec' : state.isFocused ? '#f5f6f8' : 'white',
-                  color: '#323338',
-                  ':active': {
-                    backgroundColor: '#dcdfec',
-                  },
-                }),
-                multiValue: (base, { data }) => ({
-                  ...base,
-                  backgroundColor: data.color,
-                  color: 'white',
-                }),
-                multiValueLabel: (base) => ({
-                  ...base,
-                  color: 'white',
-                  fontSize: '13px',
-                  padding: '2px 6px',
-                }),
-                multiValueRemove: (base) => ({
-                  ...base,
-                  color: 'white',
-                  ':hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                  },
-                }),
-                valueContainer: (base) => ({
-                  ...base,
-                  padding: '0 8px',
-                }),
-                input: (base) => ({
-                  ...base,
-                  margin: '0',
-                  padding: '0',
-                }),
-              }}
+          <ProjectFilter />
+          <div className="relative">
+            <input
+              type="text"
+              value={globalFilter}
+              onChange={e => setGlobalFilter(e.target.value)}
+              placeholder="Search tasks..."
+              className="pl-10 pr-4 py-2 border border-[#e6e9ef] rounded-lg focus:outline-none focus:border-[#0073ea] w-64"
             />
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#676879]" />
           </div>
-          <button className="px-4 py-2 text-[#323338] hover:bg-[#dcdfec] rounded-lg transition-colors flex items-center">
-            <FaFilter className="mr-2" />
-            <span>Filter</span>
-          </button>
         </div>
         <div className="flex items-center space-x-4">
-          <button className="px-4 py-2 text-[#323338] hover:bg-[#dcdfec] rounded-lg transition-colors flex items-center">
-            <FaSort className="mr-2" />
-            <span>Sort</span>
-          </button>
           <button
-            onClick={() => {
-              if (selectedProjects.length === 1) {
-                openNewTaskModal(selectedProjects[0].value);
-              }
-            }}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-              selectedProjects.length === 1
-                ? 'bg-[#0073ea] text-white hover:bg-[#0060c2]'
-                : 'bg-[#dcdfec] text-[#676879] cursor-not-allowed'
-            }`}
-            disabled={selectedProjects.length !== 1}
+            onClick={() => setIsNewTaskModalOpen(true)}
+            className="px-4 py-2 bg-[#0073ea] text-white rounded-lg hover:bg-[#0060c2] transition-colors flex items-center"
+            disabled={selectedProjects.size > 1}
           >
             <FaPlus className="mr-2" />
             <span>New Task</span>
+          </button>
+          <button
+            onClick={() => setIsNewProjectModalOpen(true)}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center"
+          >
+            <FaPlus className="mr-2" />
+            <span>New Project</span>
           </button>
         </div>
       </div>
@@ -356,7 +255,7 @@ const TableView: React.FC = () => {
       {/* Table Container */}
       <div className="flex-1 overflow-auto">
         {/* Table Header */}
-        <div className="sticky top-0 z-10">
+        <div className="sticky top-0 z-[1]">
           <div className="flex bg-[#f5f6f8] border-b border-[#e6e9ef]">
             {table.getHeaderGroups().map(headerGroup => (
               <div key={headerGroup.id} className="flex">
@@ -379,42 +278,35 @@ const TableView: React.FC = () => {
                           {header.column.getIsSorted() === 'desc' ? ' 🔽' : ' 🔼'}
                         </span>
                       )}
-                      <button
-                        className="p-1 hover:bg-[#dcdfec] rounded-full"
-                        title="Column Options"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsColumnMenuOpen(true);
-                        }}
-                      >
-                        <FaEllipsisH className="text-[#676879]" />
-                      </button>
-                      {isColumnMenuOpen && (
-                        <div
-                          ref={columnMenuRef}
-                          className="absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg bg-white border border-[#e6e9ef] py-2 z-20"
-                        >
-                          <button
-                            className="w-full px-4 py-2 text-left hover:bg-[#f5f6f8] flex items-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleColumnVisibility(header.column.id);
-                            }}
-                          >
-                            {header.column.getIsVisible() ? (
-                              <>
-                                <FaEye className="mr-2" />
-                                <span>Hide Column</span>
-                              </>
-                            ) : (
-                              <>
-                                <FaEyeSlash className="mr-2" />
-                                <span>Show Column</span>
-                              </>
+                      <Menu as="div" className="relative">
+                        <Menu.Button className="p-1 hover:bg-[#dcdfec] rounded-full">
+                          <FaEllipsisH className="text-[#676879]" />
+                        </Menu.Button>
+                        <Menu.Items className="absolute right-0 mt-2 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-[60]">
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                className={`${
+                                  active ? 'bg-[#f5f6f8]' : ''
+                                } group flex w-full items-center px-4 py-2 text-sm text-[#323338]`}
+                                onClick={() => header.column.toggleVisibility()}
+                              >
+                                {header.column.getIsVisible() ? (
+                                  <>
+                                    <FaEye className="mr-2" />
+                                    <span>Hide Column</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaEyeSlash className="mr-2" />
+                                    <span>Show Column</span>
+                                  </>
+                                )}
+                              </button>
                             )}
-                          </button>
-                        </div>
-                      )}
+                          </Menu.Item>
+                        </Menu.Items>
+                      </Menu>
                     </div>
                   </div>
                 ))}
@@ -438,43 +330,59 @@ const TableView: React.FC = () => {
                   className="px-4 py-2 text-sm text-[#323338] min-h-[40px] border-r border-[#e6e9ef] last:border-r-0"
                   style={{ width: cell.column.getSize() }}
                   onClick={() => {
-                    if (cell.column.id !== 'groupId') {
-                      handleEditCell(
-                        row.original.id,
-                        cell.column.id,
-                        cell.getValue() as string | number
-                      );
+                    if (
+                      cell.column.id === 'groupId' ||
+                      cell.column.id === 'status' ||
+                      cell.column.id === 'priority' ||
+                      cell.column.id === 'progress'
+                    ) {
+                      return;
                     }
+                    handleEditCell(
+                      row.original.id,
+                      cell.column.id as keyof Task,
+                      cell.getValue() as Task[keyof Task]
+                    );
                   }}
                 >
                   {editingCell?.taskId === row.original.id && editingCell?.columnId === cell.column.id ? (
                     <div className="flex items-center w-full">
-                      {cell.column.id !== 'status' && 
-                       cell.column.id !== 'priority' && 
-                       cell.column.id !== 'progress' && 
-                       cell.column.id !== 'groupId' && (
-                        <div className="flex items-center flex-1">
-                          <input
-                            type="text"
-                            value={editedValue}
-                            onChange={(e) => setEditedValue(e.target.value)}
-                            className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:border-[#0073ea]"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => handleSaveEdit(row.original.id, cell.column.id, editedValue)}
-                            className="ml-2 p-1 text-[#0073ea] hover:text-[#0060c2]"
-                          >
-                            <FaCheck />
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="ml-1 p-1 text-[#676879] hover:text-[#323338]"
-                          >
-                            <FaTimes />
-                          </button>
-                        </div>
-                      )}
+                      {cell.column.id !== 'status' &&
+                        cell.column.id !== 'priority' &&
+                        cell.column.id !== 'progress' &&
+                        cell.column.id !== 'groupId' && (
+                          <div className="flex items-center flex-1">
+                            <input
+                              type="text"
+                              value={editedValue}
+                              onChange={(e) => setEditedValue(e.target.value)}
+                              className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:border-[#0073ea]"
+                              autoFocus
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveEdit(
+                                  row.original.id,
+                                  cell.column.id as keyof Task,
+                                  editedValue as Task[keyof Task]
+                                );
+                              }}
+                              className="ml-2 p-1 text-[#0073ea] hover:text-[#0060c2]"
+                            >
+                              <FaCheck />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelEdit();
+                              }}
+                              className="ml-1 p-1 text-[#676879] hover:text-[#323338]"
+                            >
+                              <FaTimes />
+                            </button>
+                          </div>
+                        )}
                     </div>
                   ) : (
                     <div className="flex items-center">
@@ -483,7 +391,6 @@ const TableView: React.FC = () => {
                   )}
                 </div>
               ))}
-              {/* Delete button - only shows on row hover */}
               {hoveredRowId === row.id && (
                 <button
                   onClick={() => handleDeleteTask(row.original.id)}
@@ -497,16 +404,20 @@ const TableView: React.FC = () => {
         </div>
       </div>
 
-      {/* New Task Modal */}
-      {selectedProjectId && (
+      {/* Modals */}
+      {isNewTaskModalOpen && (
         <NewTaskModal
           isOpen={isNewTaskModalOpen}
-          onClose={() => {
-            setIsNewTaskModalOpen(false);
-            setSelectedProjectId(null);
-          }}
-          onSubmit={handleAddTask}
-          groupId={selectedProjectId}
+          onClose={() => setIsNewTaskModalOpen(false)}
+          onSubmit={addTask}
+          groupId={defaultProject}
+        />
+      )}
+      {isNewProjectModalOpen && (
+        <ProjectModal
+          isOpen={isNewProjectModalOpen}
+          onClose={() => setIsNewProjectModalOpen(false)}
+          onSubmit={addProject}
         />
       )}
     </div>

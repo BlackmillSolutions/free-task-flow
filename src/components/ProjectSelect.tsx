@@ -1,43 +1,17 @@
 import React from 'react';
-import { Task } from '../utils/database';
-import { FaFlag } from 'react-icons/fa';
+import { Project } from '../utils/database';
 
-interface PriorityOption {
-  value: Task['priority'];
-  label: string;
-  color: string;
-  icon: React.ReactNode;
+interface ProjectSelectProps {
+  value: string;
+  projects: Project[];
+  onChange: (value: string) => void;
 }
 
-const priorityOptions: PriorityOption[] = [
-  { 
-    value: 'low', 
-    label: 'Low', 
-    color: '#94a3b8',
-    icon: <FaFlag className="w-3 h-3" />
-  },
-  { 
-    value: 'medium', 
-    label: 'Medium', 
-    color: '#f59e0b',
-    icon: <FaFlag className="w-3 h-3" />
-  },
-  { 
-    value: 'high', 
-    label: 'High', 
-    color: '#ef4444',
-    icon: <FaFlag className="w-3 h-3" />
-  }
-];
-
-interface PrioritySelectProps {
-  value: Task['priority'];
-  onChange: (value: Task['priority']) => void;
-}
-
-const PrioritySelect: React.FC<PrioritySelectProps> = ({ value, onChange }) => {
+const ProjectSelect: React.FC<ProjectSelectProps> = ({ value, projects, onChange }) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const currentPriority = priorityOptions.find(option => option.value === value) || priorityOptions[0];
+  const currentProject = projects.find(p => p.id === value);
+
+  if (!currentProject) return null;
 
   return (
     <div className="relative inline-block w-full">
@@ -46,14 +20,15 @@ const PrioritySelect: React.FC<PrioritySelectProps> = ({ value, onChange }) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="w-full px-3 py-1.5 text-sm font-medium rounded-full flex items-center justify-between gap-2 transition-all duration-200 hover:bg-gray-50 border border-gray-200"
+        className="w-full px-3 py-1.5 text-sm font-medium rounded-full flex items-center justify-between gap-2 transition-all duration-200 hover:opacity-80"
+        style={{
+          backgroundColor: currentProject.color,
+          color: 'white'
+        }}
       >
-        <div className="flex items-center gap-2">
-          <span style={{ color: currentPriority.color }}>{currentPriority.icon}</span>
-          <span className="text-gray-700">{currentPriority.label}</span>
-        </div>
+        <span>{currentProject.name}</span>
         <svg
-          className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -90,18 +65,21 @@ const PrioritySelect: React.FC<PrioritySelectProps> = ({ value, onChange }) => {
             }
           }}
         >
-          {priorityOptions.map((option) => (
+          {projects.map((project) => (
             <button
-              key={option.value}
+              key={project.id}
               onClick={(e) => {
                 e.stopPropagation();
-                onChange(option.value);
+                onChange(project.id);
                 setIsOpen(false);
               }}
               className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 flex items-center gap-2"
             >
-              <span style={{ color: option.color }}>{option.icon}</span>
-              {option.label}
+              <span
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: project.color }}
+              />
+              {project.name}
             </button>
           ))}
         </div>
@@ -110,4 +88,4 @@ const PrioritySelect: React.FC<PrioritySelectProps> = ({ value, onChange }) => {
   );
 };
 
-export default PrioritySelect;
+export default ProjectSelect;

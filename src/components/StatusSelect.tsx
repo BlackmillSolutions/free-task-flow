@@ -25,7 +25,10 @@ const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange }) => {
   return (
     <div className="relative inline-block w-full">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="w-full px-3 py-1.5 text-sm font-medium rounded-full flex items-center justify-between gap-2 transition-all duration-200 hover:opacity-80"
         style={{
           backgroundColor: currentStatus.color,
@@ -44,11 +47,38 @@ const StatusSelect: React.FC<StatusSelectProps> = ({ value, onChange }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+        <div 
+          className="fixed z-50 w-[inherit] mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+          style={{
+            width: 'var(--select-width)',
+            top: 'var(--select-position-y)',
+            left: 'var(--select-position-x)'
+          }}
+          ref={(el) => {
+            if (el) {
+              const button = el.previousElementSibling as HTMLElement;
+              const rect = button.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const spaceAbove = rect.top;
+              const dropdownHeight = el.offsetHeight;
+              
+              el.style.setProperty('--select-width', `${button.offsetWidth}px`);
+              
+              // Position above if not enough space below
+              if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+                el.style.setProperty('--select-position-y', `${rect.top - dropdownHeight - 5}px`);
+              } else {
+                el.style.setProperty('--select-position-y', `${rect.bottom + 5}px`);
+              }
+              el.style.setProperty('--select-position-x', `${rect.left}px`);
+            }
+          }}
+        >
           {statusOptions.map((option) => (
             <button
               key={option.value}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 onChange(option.value);
                 setIsOpen(false);
               }}

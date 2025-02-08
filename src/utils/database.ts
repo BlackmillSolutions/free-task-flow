@@ -21,6 +21,7 @@ export interface Project {
   name: string;
   description: string;
   members: string[];
+  color: string;
 }
 
 export interface Database {
