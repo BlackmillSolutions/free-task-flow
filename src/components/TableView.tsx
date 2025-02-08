@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
+import ConfirmationModal from "./ConfirmationModal";
 import {
   useReactTable,
   getCoreRowModel,
@@ -64,6 +65,10 @@ const TableView: React.FC = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    taskId: string | null;
+  }>({ isOpen: false, taskId: null });
   const { defaultProject } = useProjectSelection();
 
   useEffect(() => {
@@ -205,7 +210,13 @@ const TableView: React.FC = () => {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    await deleteTask(taskId);
+    setDeleteConfirmation({ isOpen: true, taskId });
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmation.taskId) {
+      await deleteTask(deleteConfirmation.taskId);
+    }
   };
 
   if (isLoading) {
@@ -420,6 +431,15 @@ const TableView: React.FC = () => {
           onSubmit={addProject}
         />
       )}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, taskId: null })}
+        onConfirm={confirmDelete}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };
