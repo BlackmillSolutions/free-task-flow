@@ -1,25 +1,33 @@
 import React, { useState } from 'react';
 import { FaExclamationCircle, FaUserCircle, FaEllipsisH, FaPaperclip, FaRegComment } from 'react-icons/fa';
+import { format, parseISO } from "date-fns";
+import { Task } from '../utils/database';
 
-interface TaskCardProps {
-  status: string;
-  statusColor: string;
-  priority: 'high' | 'medium' | 'low';
-  dueDate: string;
-  assignee: string;
-  title?: string;
-  description?: string;
-  progress?: number;
+interface TaskCardProps extends Partial<Task> {
+  statusColor?: string;
   attachments?: number;
   comments?: number;
 }
 
+const getStatusColor = (status?: string): string => {
+  switch (status) {
+    case 'Open':
+      return '#007bff';
+    case 'In Progress':
+      return '#ffc107';
+    case 'Done':
+      return '#28a745';
+    default:
+      return '#007bff';
+  }
+};
+
 const TaskCard: React.FC<TaskCardProps> = ({
-  status,
-  statusColor,
-  priority,
-  dueDate,
-  assignee,
+  status = 'Open',
+  statusColor: providedStatusColor,
+  priority = 'medium',
+  dueDate = '',
+  assignee = '',
   title = 'Untitled Task',
   description = 'No description provided',
   progress = 0,
@@ -35,13 +43,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
     low: 'green-500',
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   return (
     <div
       className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
@@ -53,7 +54,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
         <div className="flex items-center justify-between mb-2">
           <span
             className={`px-2 py-1 rounded-full text-xs font-semibold`}
-            style={{ backgroundColor: statusColor, color: 'white' }}
+            style={{ backgroundColor: providedStatusColor || getStatusColor(status), color: 'white' }}
           >
             {status}
           </span>
@@ -70,7 +71,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
       <div className="p-3">
         <div className="flex items-center mb-3">
           <FaExclamationCircle className={`text-${priorityColors[priority]} mr-2`} />
-          <span className="text-sm text-gray-600 mr-3">{formatDate(dueDate)}</span>
+          <span className="text-sm text-gray-600 mr-3">
+            {dueDate ? format(parseISO(dueDate), 'MMM d') : '-'}
+          </span>
           <div className="flex items-center">
             <FaUserCircle className="text-gray-400 text-xl" />
             <span className="text-sm text-gray-600 ml-1">{assignee}</span>

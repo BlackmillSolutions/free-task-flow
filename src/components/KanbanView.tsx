@@ -1,36 +1,47 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { format, parseISO } from "date-fns";
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import TaskCard from './TaskCard';
 import { FaPlus, FaEllipsisH, FaTimes } from 'react-icons/fa';
-
-interface Task {
-  id: string;
-  title: string;
-  status: string;
-  statusColor: string;
-  priority: 'high' | 'medium' | 'low';
-  dueDate: string;
-  assignee: string;
-  description: string;
-  progress: number;
-  attachments: number;
-  comments: number;
-}
+import { Task } from '../utils/database';
+import { useTaskStore } from '../store/taskStore';
+import NewTaskModal from './NewTaskModal';
+import { useProjectSelection } from '../hooks/useProjectSelection';
 
 interface KanbanColumn {
   id: string;
-  title: string;
+  title: 'Open' | 'In Progress' | 'Done';
   tasks: Task[];
   color: string;
   limit?: number;
 }
 
+const getColumnColor = (status: Task['status']): string => {
+  switch (status) {
+    case 'Open':
+      return '#007bff';
+    case 'In Progress':
+      return '#ffc107';
+    case 'Done':
+      return '#28a745';
+    default:
+      return '#007bff';
+  }
+};
+
+type TaskWithMetadata = Task & {
+  attachments?: number;
+  comments?: number;
+};
+
 interface CardPreviewProps {
-  task: Task;
+  task: TaskWithMetadata;
   onClose: () => void;
 }
 
 const CardPreview: React.FC<CardPreviewProps> = ({ task, onClose }) => {
+  const statusColor = getColumnColor(task.status);
+  
   return (
     <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
@@ -41,14 +52,14 @@ const CardPreview: React.FC<CardPreviewProps> = ({ task, onClose }) => {
           </button>
         </div>
         <div className="text-sm text-gray-600">
-          <p>Status: <span className="font-medium" style={{color: task.statusColor}}>{task.status}</span></p>
+          <p>Status: <span className="font-medium" style={{color: statusColor}}>{task.status}</span></p>
           <p>Priority: {task.priority}</p>
-          <p>Due Date: {task.dueDate}</p>
+          <p>Due Date: {task.dueDate ? format(parseISO(task.dueDate), 'MMM d, yyyy') : '-'}</p>
           <p>Assignee: {task.assignee}</p>
           <p>Description: {task.description}</p>
           <p>Progress: {task.progress}%</p>
-          <p>Attachments: {task.attachments}</p>
-          <p>Comments: {task.comments}</p>
+          <p>Attachments: {task.attachments || 0}</p>
+          <p>Comments: {task.comments || 0}</p>
         </div>
       </div>
     </div>
@@ -56,75 +67,43 @@ const CardPreview: React.FC<CardPreviewProps> = ({ task, onClose }) => {
 };
 
 const KanbanView: React.FC = () => {
-  const [columns, setColumns] = useState<KanbanColumn[]>([
-    {
-      id: 'todo',
-      title: 'To Do',
-      color: '#007bff',
-      limit: 5,
-      tasks: [
-        {
-          id: '1',
-          title: 'Design New Landing Page',
-          status: 'To Do',
-          statusColor: '#007bff',
-          priority: 'high',
-          dueDate: '2024-02-10',
-          assignee: 'John Doe',
-          description: 'Create a modern and responsive landing page design.',
-          progress: 0,
-          attachments: 2,
-          comments: 3,
-        },
-      ],
-    },
-    {
-      id: 'inProgress',
-      title: 'In Progress',
-      color: '#ffc107',
-      limit: 3,
-      tasks: [
-        {
-          id: '2',
-          title: 'API Integration',
-          status: 'In Progress',
-          statusColor: '#ffc107',
-          priority: 'medium',
-          dueDate: '2024-02-15',
-          assignee: 'Jane Smith',
-          description: 'Integrate payment gateway API.',
-          progress: 50,
-          attachments: 1,
-          comments: 5,
-        },
-      ],
-    },
-    {
-      id: 'done',
-      title: 'Done',
-      color: '#28a745',
-      tasks: [
-        {
-          id: '3',
-          title: 'Bug Fixes',
-          status: 'Done',
-          statusColor: '#28a745',
-          priority: 'low',
-          dueDate: '2024-02-08',
-          assignee: 'Peter Jones',
-          description: 'Fix reported bugs in the mobile app.',
-          progress: 100,
-          attachments: 0,
-          comments: 8,
-        },
-      ],
-    },
-  ]);
+  const { tasks, selectedProjects, isLoading, fetchData, updateTask, addTask } = useTaskStore();
+  const { defaultProject } = useProjectSelection();
+  
+  const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [isWipLimitExceeded, setIsWipLimitExceeded] = useState(false);
-  const [previewTask, setPreviewTask] = useState<Task | null>(null);
+  const [previewTask, setPreviewTask] = useState<TaskWithMetadata | null>(null);
   const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({});
 
-  const onDragEnd = (result: DropResult) => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    const filteredTasks = selectedProjects.size === 0
+      ? tasks
+      : tasks.filter(task => selectedProjects.has(task.groupId));
+
+    const columnDefinitions: Array<{
+      id: string;
+      title: Task['status'];
+      limit?: number;
+    }> = [
+      { id: 'open', title: 'Open', limit: 5 },
+      { id: 'inProgress', title: 'In Progress', limit: 3 },
+      { id: 'done', title: 'Done' },
+    ];
+
+    const columns: KanbanColumn[] = columnDefinitions.map(def => ({
+      ...def,
+      color: getColumnColor(def.title),
+      tasks: filteredTasks.filter(task => task.status === def.title),
+    }));
+
+    setColumns(columns);
+  }, [tasks, selectedProjects]);
+
+  const onDragEnd = async (result: DropResult) => {
     const { source, destination } = result;
     setIsWipLimitExceeded(false);
 
@@ -147,52 +126,35 @@ const KanbanView: React.FC = () => {
       return;
     }
 
-    destTasks.splice(destination.index, 0, {
-      ...removed,
-      status: destColumn.title,
-      statusColor: destColumn.color,
-    });
+    destTasks.splice(destination.index, 0, removed);
 
-    setColumns(columns.map(col => {
-      if (col.id === source.droppableId) return { ...col, tasks: sourceTasks };
-      if (col.id === destination.droppableId) return { ...col, tasks: destTasks };
-      return col;
-    }));
+    // Extract the actual task ID from the draggableId (remove 'task-' prefix)
+    const taskId = result.draggableId.replace('task-', '');
+
+    // Update the task's status in the database
+    await updateTask(taskId, { status: destColumn.title });
   };
 
-  const handleAddTask = (columnId: string) => {
-    const newTask: Task = {
-      id: Math.random().toString(36).substring(7), // Generate a random ID
+  const handleAddTask = async (columnId: string) => {
+    const column = columns.find(col => col.id === columnId);
+    if (!column) return;
+
+    const newTask: Omit<Task, 'id'> = {
       title: 'New Task',
-      status: '',
-      statusColor: '',
+      status: column.title as 'Open' | 'In Progress' | 'Done',
       priority: 'medium',
       dueDate: '',
       assignee: '',
       description: '',
       progress: 0,
-      attachments: 0,
-      comments: 0,
+      groupId: defaultProject,
     };
 
-    setColumns(columns.map(col => {
-      if (col.id === columnId) {
-        return { ...col, tasks: [...col.tasks, newTask] };
-      }
-      return col;
-    }));
+    await addTask(newTask);
   };
 
   const handleColumnWidthChange = (columnId: string, width: number) => {
     setColumnWidths(prev => ({ ...prev, [columnId]: width }));
-  };
-
-  const handleMouseEnter = (task: Task) => {
-    setPreviewTask(task);
-  };
-
-  const handleMouseLeave = () => {
-    setPreviewTask(null);
   };
 
   useEffect(() => {
@@ -264,8 +226,8 @@ const KanbanView: React.FC = () => {
                         <div className="space-y-3">
                           {column.tasks.map((task, index) => (
                             <Draggable
-                              key={task.id}
-                              draggableId={task.id}
+                              key={`task-${task.id}`}
+                              draggableId={`task-${task.id}`}
                               index={index}
                             >
                               {(provided, snapshot) => (
@@ -273,13 +235,17 @@ const KanbanView: React.FC = () => {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  onMouseEnter={() => handleMouseEnter(task)}
-                                  onMouseLeave={handleMouseLeave}
                                   className={`transition-transform duration-200 ${
                                     snapshot.isDragging ? 'scale-105 shadow-lg' : ''
                                   }`}
+                                  onClick={() => setPreviewTask(task)}
                                 >
-                                  <TaskCard {...task} />
+                                  <TaskCard
+                                    {...task} 
+                                    statusColor={getColumnColor(task.status)}
+                                    attachments={0}
+                                    comments={0}
+                                  />
                                 </div>
                               )}
                             </Draggable>

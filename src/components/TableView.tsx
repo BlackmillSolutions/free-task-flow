@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
+import DatePicker from "react-datepicker";
+import { format, parseISO } from "date-fns";
+import "react-datepicker/dist/react-datepicker.css";
 import ConfirmationModal from "./ConfirmationModal";
 import {
   useReactTable,
@@ -130,11 +133,27 @@ const TableView: React.FC = () => {
     columnHelper.accessor((row) => row.dueDate, {
       id: 'dueDate',
       header: 'Due Date',
-      cell: info => (
-        <div className="text-[#676879]">
-          {info.getValue() ? new Date(info.getValue()).toLocaleDateString() : '-'}
-        </div>
-      ),
+      cell: info => {
+        const value = info.getValue();
+        const date = value ? parseISO(value) : null;
+        
+        return (
+          <div className="text-[#676879]" onClick={(e) => e.stopPropagation()}>
+            <DatePicker
+              selected={date}
+              onChange={(date: Date | null) => {
+                const formattedDate = date ? format(date, 'yyyy-MM-dd') : '';
+                handleSaveEdit(info.row.original.id, 'dueDate', formattedDate);
+              }}
+              dateFormat="MMM d, yyyy"
+              className="w-full border-none bg-transparent cursor-pointer focus:outline-none hover:bg-gray-100 rounded px-2 py-1"
+              placeholderText="-"
+              isClearable
+              showPopperArrow={false}
+            />
+          </div>
+        );
+      },
       size: 120,
     }),
     columnHelper.accessor((row) => row.assignee, {

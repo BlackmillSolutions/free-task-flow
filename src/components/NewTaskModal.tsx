@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Task } from '../utils/database';
+import DatePicker from "react-datepicker";
+import { format, parseISO } from "date-fns";
+import "react-datepicker/dist/react-datepicker.css";
 import { FaTimes } from 'react-icons/fa';
 import StatusSelect from './StatusSelect';
 import PrioritySelect from './PrioritySelect';
@@ -139,18 +142,21 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSubmit, 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Due Date</label>
-              <input
-                type="date"
-                className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-                  errors.dueDate ? 'border-red-500' : 'border-gray-300'
-                }`}
-                value={taskData.dueDate}
-                onChange={(e) => {
-                  setTaskData({ ...taskData, dueDate: e.target.value });
+              <DatePicker
+                selected={taskData.dueDate ? parseISO(taskData.dueDate) : null}
+                onChange={(date: Date | null) => {
+                  const formattedDate = date ? format(date, 'yyyy-MM-dd') : '';
+                  setTaskData({ ...taskData, dueDate: formattedDate });
                   if (errors.dueDate) {
                     setErrors({ ...errors, dueDate: undefined });
                   }
                 }}
+                dateFormat="MMM d, yyyy"
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
+                  errors.dueDate ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholderText="Select a date"
+                isClearable
               />
               {errors.dueDate && (
                 <p className="mt-1 text-sm text-red-500">{errors.dueDate}</p>
