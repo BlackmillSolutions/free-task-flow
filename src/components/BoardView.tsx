@@ -1,6 +1,6 @@
 import React from 'react';
 import { useViewStore } from '../store/viewStore';
-import TableView from './TableView';
+import TableView from './table/TableView';
 import KanbanView from './KanbanView';
 import CalendarView from './CalendarView';
 import TimelineView from './TimelineView';
@@ -51,7 +51,7 @@ const BoardView: React.FC = () => {
 
       {/* Board View Content */}
       <div className="flex-1 overflow-hidden">
-        {currentView === 'table' && <TableView />}
+        {currentView === 'table' && <TableView className="py-4" />}
         {currentView === 'kanban' && <KanbanView />}
         {currentView === 'calendar' && <CalendarView />}
         {currentView === 'timeline' && <TimelineView />}

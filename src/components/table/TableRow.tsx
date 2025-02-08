@@ -1,90 +1,59 @@
 import React from 'react';
-import { Row } from '@tanstack/react-table';
+import { Row, flexRender } from '@tanstack/react-table';
 import { Task } from '../../utils/database';
-import { FaTrashAlt } from 'react-icons/fa';
-import { EditableCell } from './EditableCell';
+import { IconButton } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface TableRowProps {
   row: Row<Task>;
-  editingCell: { taskId: string; columnId: keyof Task } | null;
-  editedValue: string;
-  onEditCell: (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => void;
-  onSaveEdit: (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => void;
-  onCancelEdit: () => void;
-  onDeleteTask: (taskId: string) => void;
-  setEditedValue: (value: string) => void;
+  onDeleteTask: (taskId: string) => Promise<void>;
+  onSelectTask: (task: Task) => void;
 }
 
 export const TableRow: React.FC<TableRowProps> = ({
   row,
-  editingCell,
-  editedValue,
-  onEditCell,
-  onSaveEdit,
-  onCancelEdit,
   onDeleteTask,
-  setEditedValue,
+  onSelectTask,
 }) => {
-  const [isHovered, setIsHovered] = React.useState(false);
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't open task modal if clicking on an interactive element
+    const target = e.target as HTMLElement;
+    const isInteractive = target.closest('button, input, [role="button"]');
+    if (!isInteractive) {
+      onSelectTask(row.original);
+    }
+  };
 
   return (
     <div
-      className="flex border-b border-[#e6e9ef] hover:bg-[#f5f6f8] relative group"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onClick={handleClick}
+      className={`flex items-center border-b border-[#e6e9ef] min-h-[40px] ${
+        row.getIsSelected() ? 'bg-[#f0f7ff]' : ''
+      } hover:bg-[#f5f6f8] transition-colors duration-150 cursor-pointer`}
     >
-      {row.getVisibleCells().map(cell => (
-        <div
-          key={cell.id}
-          className="px-4 py-2 text-sm text-[#323338] min-h-[40px] border-r border-[#e6e9ef] last:border-r-0"
-          style={{ width: cell.column.getSize() }}
-          onClick={() => {
-            if (
-              cell.column.id === 'groupId' ||
-              cell.column.id === 'status' ||
-              cell.column.id === 'priority' ||
-              cell.column.id === 'progress'
-            ) {
-              return;
-            }
-            onEditCell(
-              row.original.id,
-              cell.column.id as keyof Task,
-              cell.getValue() as Task[keyof Task]
-            );
+      <div className="flex items-center flex-1">
+        {row.getVisibleCells().map(cell => (
+          <div
+            key={cell.id}
+            className="px-2 py-1"
+            style={{ width: cell.column.getSize() }}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </div>
+        ))}
+      </div>
+      <div className="px-2">
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteTask(row.original.id);
           }}
+          className="text-gray-400 hover:text-red-500"
         >
-          {editingCell?.taskId === row.original.id && editingCell?.columnId === cell.column.id ? (
-            <EditableCell
-              value={editedValue}
-              onChange={setEditedValue}
-              onSave={() => onSaveEdit(
-                row.original.id,
-                cell.column.id as keyof Task,
-                editedValue as Task[keyof Task]
-              )}
-              onCancel={onCancelEdit}
-              columnId={cell.column.id as keyof Task}
-            />
-          ) : (
-            <div className="flex items-center">
-              {cell.column.columnDef.cell && 
-                typeof cell.column.columnDef.cell === 'function' 
-                  ? cell.column.columnDef.cell(cell.getContext())
-                  : cell.getValue()
-              }
-            </div>
-          )}
-        </div>
-      ))}
-      {isHovered && (
-        <button
-          onClick={() => onDeleteTask(row.original.id)}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-[#676879] hover:text-[#323338] bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <FaTrashAlt size={14} />
-        </button>
-      )}
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </div>
     </div>
   );
 };

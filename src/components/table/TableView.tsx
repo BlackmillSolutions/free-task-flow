@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import TaskDetailModal from '../TaskDetailModal';
 import {
   useReactTable,
@@ -7,6 +7,8 @@ import {
   getFilteredRowModel,
   SortingState,
   VisibilityState,
+  RowSelectionState,
+  ColumnResizeMode,
 } from '@tanstack/react-table';
 import { rankItem } from '@tanstack/match-sorter-utils';
 import { Task } from '../../utils/database';
@@ -26,7 +28,11 @@ const fuzzyFilter = (row: any, columnId: string, value: string, addMeta: any) =>
   return itemRank.passed;
 };
 
-const TableView: React.FC = () => {
+interface TableViewProps {
+  className?: string;
+}
+
+const TableView: React.FC<TableViewProps> = ({ className = '' }) => {
   const {
     tasks,
     projects,
@@ -40,12 +46,11 @@ const TableView: React.FC = () => {
   } = useTaskStore();
 
   const [globalFilter, setGlobalFilter] = useState('');
-  const [editingCell, setEditingCell] = useState<{ taskId: string; columnId: keyof Task } | null>(null);
-  const [editedValue, setEditedValue] = useState('');
-  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -63,8 +68,8 @@ const TableView: React.FC = () => {
   }, [tasks, selectedProjects]);
 
   const columns = useMemo(
-    () => createTableColumns(projects, handleSaveEdit),
-    [projects]
+    () => createTableColumns(projects, updateTask),
+    [projects, updateTask]
   );
 
   const table = useReactTable({
@@ -74,7 +79,12 @@ const TableView: React.FC = () => {
       sorting,
       columnVisibility,
       globalFilter,
+      rowSelection,
     },
+    enableRowSelection: true,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange' as ColumnResizeMode,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
@@ -83,42 +93,6 @@ const TableView: React.FC = () => {
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
-
-  const tableRef = useRef<HTMLDivElement>(null);
-
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (editingCell && tableRef.current && !tableRef.current.contains(event.target as Node)) {
-      handleSaveEdit(editingCell.taskId, editingCell.columnId, editedValue as Task[keyof Task]);
-    }
-  }, [editingCell, editedValue]);
-
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [handleClickOutside]);
-
-  const handleEditCell = (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => {
-    const autoSaveColumns = ['status', 'priority', 'progress', 'dueDate'];
-    if (autoSaveColumns.includes(columnId)) {
-      handleSaveEdit(taskId, columnId, value);
-    } else {
-      setEditingCell({ taskId, columnId });
-      setEditedValue(String(value));
-    }
-  };
-
-  function handleSaveEdit(taskId: string, columnId: keyof Task, value: Task[keyof Task]) {
-    updateTask(taskId, { [columnId]: value });
-    setEditingCell(null);
-    setEditedValue('');
-  }
-
-  const handleCancelEdit = () => {
-    setEditingCell(null);
-    setEditedValue('');
-  };
 
   const handleDeleteTask = async (taskId: string) => {
     setDeleteConfirmation({ isOpen: true, taskId });
@@ -140,7 +114,7 @@ const TableView: React.FC = () => {
   }
 
   return (
-    <div ref={tableRef} className="flex flex-col h-full bg-white relative">
+    <div className={`flex flex-col h-full bg-white relative ${className}`}>
       <TableHeader
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
@@ -166,19 +140,12 @@ const TableView: React.FC = () => {
         {/* Table Body */}
         <div className="flex-1">
           {table.getRowModel().rows.map(row => (
-                  <div onClick={() => !editingCell && setSelectedTask(row.original)}>
-                    <TableRow
-                      key={row.id}
-                      row={row}
-                      editingCell={editingCell}
-                      editedValue={editedValue}
-                      onEditCell={handleEditCell}
-                      onSaveEdit={handleSaveEdit}
-                      onCancelEdit={handleCancelEdit}
-                      onDeleteTask={handleDeleteTask}
-                      setEditedValue={setEditedValue}
-                    />
-                  </div>
+            <TableRow
+              key={row.id}
+              row={row}
+              onDeleteTask={handleDeleteTask}
+              onSelectTask={setSelectedTask}
+            />
           ))}
         </div>
       </div>

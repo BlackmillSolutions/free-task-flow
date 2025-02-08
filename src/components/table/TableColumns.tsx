@@ -11,7 +11,7 @@ const columnHelper = createColumnHelper<Task>();
 
 export const createTableColumns = (
   projects: Project[],
-  handleSaveEdit: (taskId: string, columnId: keyof Task, value: Task[keyof Task]) => void
+  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
 ): ColumnDef<Task, any>[] => [
   columnHelper.accessor((row) => row.title, {
     id: 'title',
@@ -27,7 +27,7 @@ export const createTableColumns = (
         <ProjectSelect
           value={info.getValue()}
           projects={projects}
-          onChange={(value) => handleSaveEdit(info.row.original.id, 'groupId', value)}
+          onChange={(value) => updateTask(info.row.original.id, { groupId: value })}
         />
       </div>
     ),
@@ -40,7 +40,7 @@ export const createTableColumns = (
       <div className="w-[140px]">
         <StatusSelect
           value={info.getValue()}
-          onChange={(value) => handleSaveEdit(info.row.original.id, 'status', value)}
+          onChange={(value) => updateTask(info.row.original.id, { status: value })}
         />
       </div>
     ),
@@ -53,7 +53,7 @@ export const createTableColumns = (
       <div className="w-[140px]">
         <PrioritySelect
           value={info.getValue()}
-          onChange={(value) => handleSaveEdit(info.row.original.id, 'priority', value)}
+          onChange={(value) => updateTask(info.row.original.id, { priority: value })}
         />
       </div>
     ),
@@ -66,7 +66,7 @@ export const createTableColumns = (
       <div className="w-[140px]">
         <DueDateCell
           value={info.getValue()}
-          onChange={(value) => handleSaveEdit(info.row.original.id, 'dueDate', value)}
+          onChange={(value) => updateTask(info.row.original.id, { dueDate: value })}
         />
       </div>
     ),
@@ -99,7 +99,7 @@ export const createTableColumns = (
       <div className="w-[140px]">
         <ProgressBar
           value={info.getValue()}
-          onChange={(value) => handleSaveEdit(info.row.original.id, 'progress', value)}
+          onChange={(value) => updateTask(info.row.original.id, { progress: value })}
         />
       </div>
     ),
