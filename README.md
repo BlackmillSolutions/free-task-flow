@@ -4,10 +4,18 @@ A project management tool designed to provide users with a visual and intuitive 
 
 ## Features
 
-*   **Multiple Views:** Switch between Table, Kanban, Calendar, and Timeline views to visualize your project data in different ways.
+*   **Multiple Views:** Switch between Table, Kanban, Calendar, Timeline, and Dashboard views to visualize your project data in different ways.
 *   **Sidebar Navigation:** Easily navigate between different sections of the application using the sidebar, including links to Home, Tasks, and Dashboard.
 *   **Header:** The header provides quick access to search, creating new tasks, filtering, notifications, and user profile settings.
 *   **Mobile-Responsive:** The application is designed to be responsive and work well on different screen sizes, with a toggleable sidebar for mobile devices.
+*   **Dashboard View:** Get an overview of your projects and tasks with the customizable dashboard view.
+*   **Project Management:** Create, select, and manage projects to organize your tasks.
+*   **Task Prioritization:** Set priorities for your tasks to focus on what's important.
+*   **Task Status:** Track the status of your tasks to monitor progress.
+*   **Keyboard Shortcuts:** Use keyboard shortcuts for faster navigation and task management.
+*   **Confirmation Modal:** Confirm important actions to prevent accidental data loss.
+*   **Table View Enhancements:** Edit tasks directly in the table view with enhanced features like editable cells and column headers.
+*   **Task Filtering:** Filter tasks by project to focus on specific areas.
 
 ## Technologies Used
 
@@ -44,15 +52,32 @@ The project structure is organized as follows:
 *   `src/`: Contains the main source code of the application.
     *   `App.tsx`: The main application component that sets up the overall layout.
     *   `components/`: Contains reusable React components.
-        *   `BoardView.tsx`: Handles switching between different views (Table, Kanban, Calendar, Timeline).
+        *   `BoardView.tsx`: Handles switching between different views (Table, Kanban, Calendar, Timeline, and Dashboard).
         *   `Header.tsx`: Defines the header section of the application.
         *   `Sidebar.tsx`: Defines the sidebar navigation.
         *   `TableView.tsx`: Implements the table view.
         *   `KanbanView.tsx`: Implements the kanban view.
         *   `CalendarView.tsx`: Implements the calendar view.
         *   `TimelineView.tsx`: Implements the timeline view.
+        *   `DashboardView.tsx`: Implements the dashboard view.
+        *   `ProjectModal.tsx`: Implements the project modal.
+        *   `ProjectSelect.tsx`: Implements the project select component.
+        *   `PrioritySelect.tsx`: Implements the priority select component.
+        *   `StatusSelect.tsx`: Implements the status select component.
+        *   `KeyboardShortcutOverlay.tsx`: Implements the keyboard shortcut overlay.
+        *   `ConfirmationModal.tsx`: Implements the confirmation modal.
+        *   `table/`: Contains components for the table view.
+            *   `EditableCell.tsx`: Implements the editable cell component.
+            *   `TableColumnHeader.tsx`: Implements the table column header component.
+            *   `TableColumns.tsx`: Defines the table columns.
+            *   `TableHeader.tsx`: Defines the table header.
+            *   `TableRow.tsx`: Implements the table row component.
+            *   `TableView.tsx`: Implements the table view component.
     *   `store/`: Contains state management logic.
+        *   `taskStore.ts`: Manages the task state using Zustand.
         *   `viewStore.ts`: Manages the current view state using Zustand.
+    *   `hooks/`: Contains custom hooks.
+        *   `useProjectSelection.ts`: Manages the project selection state.
 
 ## Contributing
 
